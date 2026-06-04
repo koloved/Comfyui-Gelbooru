@@ -57,9 +57,10 @@ def pil2tensor(image):
 class UrlsToImage:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {"urls": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": False})}}
+        return {"required": {"urls": ("STRING", {"default": "", "multiline": True, "dynamicPrompts": False, "tooltip": "Image URLs to load, one per line (supports http://, data:image/, s3://)"})}}
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES=("images",)
+    OUTPUT_TOOLTIPS = ("Loaded image tensor(s) from the provided URLs",)
     FUNCTION = "execute"
     CATEGORY = "Gelbooru"
 
@@ -89,25 +90,35 @@ class GelbooruRandom:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "site":(["Gelbooru", "Rule34"],{}),
-                "OR_tags": ("STRING", {"default": "", "multiline": True}),
-                "AND_tags": ("STRING", {"default": "", "multiline": True}),
-                "exclude_tag": ("STRING", {"default": "animated,", "multiline": True}),
-                "note_area": ("STRING",{"default": "", "multiline": True}),
-                "Safe": ("BOOLEAN", {"default": True}),
-                "Questionable": ("BOOLEAN", {"default": True}),
-                "Explicit": ("BOOLEAN", {"default": True}),
-                "score": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "api_credentials": ("STRING", {"default": ""}),
+                "site":(["Gelbooru", "Rule34"],{"tooltip": "Image board to search: Gelbooru or Rule34"}),
+                "OR_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "Tags combined with OR logic (comma-separated, at least one must match)"}),
+                "AND_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "Tags combined with AND logic (comma-separated, all must match)"}),
+                "exclude_tag": ("STRING", {"default": "animated,", "multiline": True, "tooltip": "Tags to exclude from results (comma-separated)"}),
+                "note_area": ("STRING",{"default": "", "multiline": True, "tooltip": "A workspace for notes or AI instructions (not sent to API)"}),
+                "Safe": ("BOOLEAN", {"default": True, "tooltip": "Include Safe/General rated posts"}),
+                "Questionable": ("BOOLEAN", {"default": True, "tooltip": "Include Questionable/Sensitive rated posts"}),
+                "Explicit": ("BOOLEAN", {"default": True, "tooltip": "Include Explicit rated posts"}),
+                "score": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "tooltip": "Minimum score threshold (0 = no filter)"}),
+                "api_credentials": ("STRING", {"default": "", "tooltip": "API credentials in format: api_key=YOUR_KEY&user_id=YOUR_ID"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "count": ("INT", {"default": 1, "min": 1, "max": 100}),
-                "use_last_prompt": ("BOOLEAN", {"default": False}),
-                "return_picture": ("BOOLEAN", {"default": False}),
+                "count": ("INT", {"default": 1, "min": 1, "max": 100, "tooltip": "Number of posts to fetch per request (max 100)"}),
+                "use_last_prompt": ("BOOLEAN", {"default": False, "tooltip": "Reuse the previous API response without making a new request"}),
+                "return_picture": ("BOOLEAN", {"default": False, "tooltip": "Download the first post's image and output as IMAGE tensor"}),
             },
         }
         
     RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING","STRING","IMAGE")
     RETURN_NAMES = ("imgtags","imgurl","imgid","width", "height", "source", "url","IMAGE")
+    OUTPUT_TOOLTIPS = (
+        "All tags of the fetched post(s), comma-separated",
+        "Direct file URL(s) of the image(s)",
+        "Post ID(s) on the image board",
+        "Width of the image(s) in pixels",
+        "Height of the image(s) in pixels",
+        "Source website URL(s) of the post(s)",
+        "The full API query URL used for the request",
+        "Image tensor (only populated when return_picture is enabled)",
+    )
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
@@ -253,14 +264,23 @@ class GelbooruID:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "post_id": ("STRING", {"default": ""}),
-                "use_last_prompt": ("BOOLEAN", {"default": False}),
-                "return_picture": ("BOOLEAN", {"default": False}),
+                "post_id": ("STRING", {"default": "", "tooltip": "Numeric ID of the Gelbooru post to fetch"}),
+                "use_last_prompt": ("BOOLEAN", {"default": False, "tooltip": "Reuse the previous API response without making a new request"}),
+                "return_picture": ("BOOLEAN", {"default": False, "tooltip": "Download the post's image and output as IMAGE tensor"}),
             },
         }
         
     RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING","IMAGE")
     RETURN_NAMES = ("imgtags","imgurl","imgid","width", "height", "source","IMAGE")
+    OUTPUT_TOOLTIPS = (
+        "All tags of the fetched post, comma-separated",
+        "Direct file URL of the image",
+        "Post ID on the image board",
+        "Width of the image in pixels",
+        "Height of the image in pixels",
+        "Source website URL of the post",
+        "Image tensor (only populated when return_picture is enabled)",
+    )
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
   
