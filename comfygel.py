@@ -91,8 +91,9 @@ class GelbooruRandom:
                 "site":(["Gelbooru", "Rule34"],{"tooltip": "Image board to search: Gelbooru or Rule34"}),
                 "OR_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "At least one of these tags must be present (broadens results). Example: blonde, red_hair finds images with EITHER blonde OR red_hair. Use when you want variants (hair colors, poses, outfits) in one search"}),
                 "AND_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "All of these tags must be present on the image (narrows results). Example: 1girl, smile finds images with BOTH 1girl AND smile"}),
-                "exclude_tag": ("STRING", {"default": "animated,", "multiline": True, "tooltip": "Tags to exclude from results (comma-separated)"}),
-                "note_area": ("STRING",{"default": "", "multiline": True, "tooltip": "A workspace for notes or AI instructions (not sent to API)"}),
+"exclude_tag": ("STRING", {"default": "animated,", "multiline": True, "tooltip": "Tags to exclude from results (comma-separated)"}),
+"remove_tags": ("STRING", {"default": "censored, mosaic_censoring, bar_censor", "multiline": True, "tooltip": "Tags to remove from the output imgtags (comma-separated). Useful for filtering out unwanted tags from the result"}),
+"note_area": ("STRING",{"default": "", "multiline": True, "tooltip": "Additional text appended to the imgtags output (useful for adding custom tags or instructions for the next node)"}),
                 "Safe": ("BOOLEAN", {"default": True, "tooltip": "Include Safe/General rated posts"}),
                 "Questionable": ("BOOLEAN", {"default": True, "tooltip": "Include Questionable/Sensitive rated posts"}),
                 "Explicit": ("BOOLEAN", {"default": True, "tooltip": "Include Explicit rated posts"}),
@@ -120,7 +121,7 @@ class GelbooruRandom:
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
-    def get_value(self, site, OR_tags, AND_tags, exclude_tag, note_area, score, api_credentials, seed, count, Safe, Questionable, Explicit, use_last_prompt=False, return_picture=False):
+    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, note_area, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False):
         cached = use_last_prompt and self.last_prompt != ""
         if cached:
             imgtags, imgurl, imgid, width, height, source, url = self.last_prompt
@@ -204,6 +205,8 @@ class GelbooruRandom:
                 posts = response.json().get('post', [])
 
             imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
+            if note_area.strip():
+                imgtags = imgtags + '\n' + note_area
             imgurl = '\n'.join(post.get("file_url", "") for post in posts)
             imgid = '\n'.join(str(post.get("id", "")) for post in posts)
             width = '\n'.join(str(post.get("width", 0)) for post in posts)
@@ -212,6 +215,15 @@ class GelbooruRandom:
             
             self.last_prompt = (imgtags, imgurl, imgid, width, height, source, url)
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
+
+        if remove_tags.strip():
+            to_remove = set(t.strip().lower() for t in remove_tags.split(',') if t.strip())
+            cleaned = []
+            for line in imgtags.split('\n'):
+                tags = [t.strip() for t in line.split(',')]
+                tags = [t for t in tags if t.lower() not in to_remove]
+                cleaned.append(', '.join(tags))
+            imgtags = '\n'.join(cleaned)
 
         if return_picture:
             if cached:
