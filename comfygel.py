@@ -10,6 +10,7 @@ from PIL import Image, ImageOps
 import torch
 import boto3
 import comfy
+import time
 
 
 #urls to image from https://github.com/wmatson/easy-comfy-nodes/blob/main/__init__.py#L140
@@ -22,6 +23,7 @@ def loadImageFromUrl(url):
         obj = s3.get_object(Bucket=bucket, Key=key)
         i = Image.open(io.BytesIO(obj['Body'].read()))
     else:
+        time.sleep(0.1)
         response = requests.get(url, timeout=5)
         if response.status_code != 200:
             raise Exception(response.text)
@@ -161,6 +163,7 @@ class GelbooruRandom:
         url = f"{base_url}?{query_params}".replace("-+", "")
         url = re.sub(r"\++", "+", url)
         
+        time.sleep(0.1)
         response = requests.get(url, verify=True)
 
         if site == "Rule34":
@@ -193,6 +196,7 @@ class GelbooruID:
   
     def get_value(self, post_id):
         url = "https://gelbooru.com/index.php?page=dapi&s=post&q=index&id="+post_id+"&json=1"
+        time.sleep(0.1)
         posts = requests.get(url).json()["post"]
 
         imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
