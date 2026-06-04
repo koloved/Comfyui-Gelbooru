@@ -11,6 +11,7 @@ import torch
 import boto3
 import comfy
 import time
+import urllib.parse
 
 
 #urls to image from https://github.com/wmatson/easy-comfy-nodes/blob/main/__init__.py#L140
@@ -89,8 +90,7 @@ class GelbooruRandom:
                 "Questionable": ("BOOLEAN", {"default": True}),
                 "Explicit": ("BOOLEAN", {"default": True}),
                 "score": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "user_id": ("STRING", {"default": ""}),
-                "api_key": ("STRING", {"default": ""}),
+                "api_credentials": ("STRING", {"default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "count": ("INT", {"default": 1, "min": 1, "max": 100}),
 
@@ -102,7 +102,16 @@ class GelbooruRandom:
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
-    def get_value(self, site, OR_tags, AND_tags, exclude_tag, note_area, score, user_id, api_key, seed, count, Safe, Questionable, Explicit):
+    def get_value(self, site, OR_tags, AND_tags, exclude_tag, note_area, score, api_credentials, seed, count, Safe, Questionable, Explicit):
+        parsed = urllib.parse.parse_qs(api_credentials.lstrip('&'))
+        api_key = parsed.get('api_key', [''])[0]
+        user_id = parsed.get('user_id', [''])[0]
+        if not api_key and not user_id:
+            raise ValueError(
+                "API credentials are required.\n"
+                "Get your API key at the bottom of:\n"
+                "https://gelbooru.com/index.php?page=account&s=options"
+            )
         #AND_tags
         AND_tags = AND_tags.rstrip(',').rstrip(' ')
         AND_tags = AND_tags.split(',')
