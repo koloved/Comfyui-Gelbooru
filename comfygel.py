@@ -51,6 +51,9 @@ def loadImageFromUrl(url):
 
     return (image, mask)
 
+def pil2tensor(image):
+    return torch.from_numpy(np.array(image).astype(np.float32) / 255.0).unsqueeze(0)
+
 class UrlsToImage:
     @classmethod
     def INPUT_TYPES(s):
@@ -77,6 +80,11 @@ class UrlsToImage:
 
 
 class GelbooruRandom:
+    def __init__(self):
+        self.last_prompt = ""
+        self.file_url = ""
+        self.image = None
+
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -93,128 +101,227 @@ class GelbooruRandom:
                 "api_credentials": ("STRING", {"default": ""}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "count": ("INT", {"default": 1, "min": 1, "max": 100}),
-
+                "use_last_prompt": ("BOOLEAN", {"default": False}),
+                "return_picture": ("BOOLEAN", {"default": False}),
             },
         }
         
-    RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING","STRING",)
-    RETURN_NAMES = ("imgtags","imgurl","imgid","width", "height", "source", "url",)
+    RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING","STRING","IMAGE")
+    RETURN_NAMES = ("imgtags","imgurl","imgid","width", "height", "source", "url","IMAGE")
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
-    def get_value(self, site, OR_tags, AND_tags, exclude_tag, note_area, score, api_credentials, seed, count, Safe, Questionable, Explicit):
-        parsed = urllib.parse.parse_qs(api_credentials.lstrip('&'))
-        api_key = parsed.get('api_key', [''])[0]
-        user_id = parsed.get('user_id', [''])[0]
-        if not api_key and not user_id:
-            raise ValueError(
-                "API credentials are required.\n"
-                "Get your API key at the bottom of:\n"
-                "https://gelbooru.com/index.php?page=account&s=options"
+    def get_value(self, site, OR_tags, AND_tags, exclude_tag, note_area, score, api_credentials, seed, count, Safe, Questionable, Explicit, use_last_prompt=False, return_picture=False):
+        cached = use_last_prompt and self.last_prompt != ""
+        if cached:
+            imgtags, imgurl, imgid, width, height, source, url = self.last_prompt
+            img_url = self.file_url
+        else:
+            parsed = urllib.parse.parse_qs(api_credentials.lstrip('&'))
+            api_key = parsed.get('api_key', [''])[0]
+            user_id = parsed.get('user_id', [''])[0]
+            if not api_key and not user_id:
+                raise ValueError(
+                    "API credentials are required.\n"
+                    "Get your API key at the bottom of:\n"
+                    "https://gelbooru.com/index.php?page=account&s=options"
+                )
+            #AND_tags
+            AND_tags = AND_tags.rstrip(',').rstrip(' ')
+            AND_tags = AND_tags.split(',')
+            AND_tags = [item.strip().replace(' ', '_').replace('\\', '') for item in AND_tags]
+            AND_tags = [item for item in AND_tags if item]
+            if len(AND_tags) > 1:
+                AND_tags = '+'.join(AND_tags)
+            else:
+                AND_tags = AND_tags[0] if AND_tags else ''
+            #OR_tags
+            OR_tags = OR_tags.rstrip(',').rstrip(' ')
+            OR_tags = OR_tags.split(',')
+            OR_tags = [item.strip().replace(' ', '_').replace('\\', '') for item in OR_tags]
+            OR_tags = [item for item in OR_tags if item]
+            if len(OR_tags) > 1:
+                 if site == "Rule34":
+                    OR_tags = '( ' + ' ~ '.join(OR_tags) + ' )'
+                 else:
+                    OR_tags = '{' + ' ~ '.join(OR_tags) + '}'
+            else:
+                OR_tags = OR_tags[0] if OR_tags else ''
+
+            exclude_tag = '+'.join('-' + item.strip().replace(' ', '_') for item in exclude_tag.split(','))
+            
+            score, count = str(score), str(count)
+
+            rate_exclusion = ""
+            
+            if not Safe: 
+                if site == "Rule34":
+                    rate_exclusion += "+-rating%3asafe"
+                elif site == "Gelbooru":
+                    rate_exclusion += "+-rating%3ageneral"
+
+            if not Questionable: 
+                if site == "Rule34":
+                    rate_exclusion += "+-rating%3aquestionable" 
+                elif site == "Gelbooru":
+                    rate_exclusion += "+-rating%3aquestionable+-rating%3aSensitive"
+
+            if not Explicit: 
+                if site == "Rule34":
+                    rate_exclusion += "+-rating%3aexplicit" 
+                elif site == "Gelbooru":
+                    rate_exclusion += "+-rating%3aexplicit" 
+
+            
+            if site == "Rule34":
+                base_url = "https://api.rule34.xxx/index.php"
+            else:
+                base_url = "https://gelbooru.com/index.php"
+          
+            query_params = (
+                f"page=dapi&s=post&q=index&tags=sort%3arandom+"
+                f"{exclude_tag}+{OR_tags}+{AND_tags}+{rate_exclusion}"
+                f"+score%3a>{score}&api_key={api_key}&user_id={user_id}&limit={count}&json=1"
             )
-        #AND_tags
-        AND_tags = AND_tags.rstrip(',').rstrip(' ')
-        AND_tags = AND_tags.split(',')
-        AND_tags = [item.strip().replace(' ', '_').replace('\\', '') for item in AND_tags]
-        AND_tags = [item for item in AND_tags if item]
-        if len(AND_tags) > 1:
-            AND_tags = '+'.join(AND_tags)
-        else:
-            AND_tags = AND_tags[0] if AND_tags else ''
-        #OR_tags
-        OR_tags = OR_tags.rstrip(',').rstrip(' ')
-        OR_tags = OR_tags.split(',')
-        OR_tags = [item.strip().replace(' ', '_').replace('\\', '') for item in OR_tags]
-        OR_tags = [item for item in OR_tags if item]
-        if len(OR_tags) > 1:
-             if site == "Rule34":
-                OR_tags = '( ' + ' ~ '.join(OR_tags) + ' )'
-             else:
-                OR_tags = '{' + ' ~ '.join(OR_tags) + '}'
-        else:
-            OR_tags = OR_tags[0] if OR_tags else ''
+            url = f"{base_url}?{query_params}".replace("-+", "")
+            url = re.sub(r"\++", "+", url)
+            
+            time.sleep(0.1)
+            response = requests.get(url, verify=True)
 
-        exclude_tag = '+'.join('-' + item.strip().replace(' ', '_') for item in exclude_tag.split(','))
-        
-        score, count = str(score), str(count)
-
-        rate_exclusion = ""
-        
-        if not Safe: 
             if site == "Rule34":
-                rate_exclusion += "+-rating%3asafe"
-            elif site == "Gelbooru":
-                rate_exclusion += "+-rating%3ageneral"
+                posts = response.json()
+            else:
+                posts = response.json().get('post', [])
 
-        if not Questionable: 
-            if site == "Rule34":
-                rate_exclusion += "+-rating%3aquestionable" 
-            elif site == "Gelbooru":
-                rate_exclusion += "+-rating%3aquestionable+-rating%3aSensitive"
+            imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
+            imgurl = '\n'.join(post.get("file_url", "") for post in posts)
+            imgid = '\n'.join(str(post.get("id", "")) for post in posts)
+            width = '\n'.join(str(post.get("width", 0)) for post in posts)
+            height = '\n'.join(str(post.get("height", 0)) for post in posts)
+            source = '\n'.join(post.get("source", "") for post in posts)
+            
+            self.last_prompt = (imgtags, imgurl, imgid, width, height, source, url)
+            self.file_url = imgurl.split('\n')[0] if imgurl else ""
 
-        if not Explicit: 
-            if site == "Rule34":
-                rate_exclusion += "+-rating%3aexplicit" 
-            elif site == "Gelbooru":
-                rate_exclusion += "+-rating%3aexplicit" 
-
-        
-        if site == "Rule34":
-            base_url = "https://api.rule34.xxx/index.php"
+        if return_picture:
+            if cached:
+                if self.file_url == img_url and self.image is not None:
+                    img = self.image
+                else:
+                    img_url = self.file_url
+                    if img_url:
+                        res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
+                        if res.status_code == 200:
+                            img = Image.open(io.BytesIO(res.content))
+                            if img.mode != "RGB":
+                                img = img.convert("RGB")
+                            self.image = img
+                            self.file_url = img_url
+                        else:
+                            print(f"Error in image download: HTTP Code {res.status_code}")
+                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                    else:
+                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            else:
+                img_url = self.file_url
+                if img_url:
+                    res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
+                    if res.status_code == 200:
+                        img = Image.open(io.BytesIO(res.content))
+                        if img.mode != "RGB":
+                            img = img.convert("RGB")
+                        self.image = img
+                        self.file_url = img_url
+                    else:
+                        print(f"Error in image download: HTTP Code {res.status_code}")
+                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                else:
+                    img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            return (imgtags, imgurl, imgid, width, height, source, url, pil2tensor(img))
         else:
-            base_url = "https://gelbooru.com/index.php"
-      
-        query_params = (
-            f"page=dapi&s=post&q=index&tags=sort%3arandom+"
-            f"{exclude_tag}+{OR_tags}+{AND_tags}+{rate_exclusion}"
-            f"+score%3a>{score}&api_key={api_key}&user_id={user_id}&limit={count}&json=1"
-        )
-        url = f"{base_url}?{query_params}".replace("-+", "")
-        url = re.sub(r"\++", "+", url)
-        
-        time.sleep(0.1)
-        response = requests.get(url, verify=True)
-
-        if site == "Rule34":
-            posts = response.json()
-        else:
-            posts = response.json().get('post', [])
-
-        imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
-        imgurl = '\n'.join(post.get("file_url", "") for post in posts)
-        imgid = '\n'.join(str(post.get("id", "")) for post in posts)
-        width = '\n'.join(str(post.get("width", 0)) for post in posts)
-        height = '\n'.join(str(post.get("height", 0)) for post in posts)
-        source = '\n'.join(post.get("source", "") for post in posts)
-        
-        return (imgtags, imgurl, imgid, width, height, source, url,)
+            empty_image = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            return (imgtags, imgurl, imgid, width, height, source, url, pil2tensor(empty_image))
 
 class GelbooruID:
+    def __init__(self):
+        self.last_prompt = ""
+        self.file_url = ""
+        self.image = None
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "post_id": ("STRING", {"default": ""}),
+                "use_last_prompt": ("BOOLEAN", {"default": False}),
+                "return_picture": ("BOOLEAN", {"default": False}),
             },
         }
         
-    RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING",)
-    RETURN_NAMES = ("imgtags","imgurl","imgid","width", "height", "source", )
+    RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING","IMAGE")
+    RETURN_NAMES = ("imgtags","imgurl","imgid","width", "height", "source","IMAGE")
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
   
-    def get_value(self, post_id):
-        url = "https://gelbooru.com/index.php?page=dapi&s=post&q=index&id="+post_id+"&json=1"
-        time.sleep(0.1)
-        posts = requests.get(url).json()["post"]
+    def get_value(self, post_id, use_last_prompt=False, return_picture=False):
+        cached = use_last_prompt and self.last_prompt != ""
+        if cached:
+            imgtags, imgurl, imgid, width, height, source = self.last_prompt
+            img_url = self.file_url
+        else:
+            url = "https://gelbooru.com/index.php?page=dapi&s=post&q=index&id="+post_id+"&json=1"
+            time.sleep(0.1)
+            posts = requests.get(url).json()["post"]
 
-        imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
-        imgurl = '\n'.join(post.get("file_url", "") for post in posts)
-        imgid = '\n'.join(str(post.get("id", "")) for post in posts)
-        width = '\n'.join(str(post.get("width", 0)) for post in posts)
-        height = '\n'.join(str(post.get("height", 0)) for post in posts)
-        source = '\n'.join(post.get("source", "") for post in posts)
-        return (imgtags, imgurl, imgid, width, height, source, )
+            imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
+            imgurl = '\n'.join(post.get("file_url", "") for post in posts)
+            imgid = '\n'.join(str(post.get("id", "")) for post in posts)
+            width = '\n'.join(str(post.get("width", 0)) for post in posts)
+            height = '\n'.join(str(post.get("height", 0)) for post in posts)
+            source = '\n'.join(post.get("source", "") for post in posts)
+
+            self.last_prompt = (imgtags, imgurl, imgid, width, height, source)
+            self.file_url = imgurl.split('\n')[0] if imgurl else ""
+
+        if return_picture:
+            if cached:
+                if self.file_url == img_url and self.image is not None:
+                    img = self.image
+                else:
+                    img_url = self.file_url
+                    if img_url:
+                        res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
+                        if res.status_code == 200:
+                            img = Image.open(io.BytesIO(res.content))
+                            if img.mode != "RGB":
+                                img = img.convert("RGB")
+                            self.image = img
+                            self.file_url = img_url
+                        else:
+                            print(f"Error in image download: HTTP Code {res.status_code}")
+                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                    else:
+                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            else:
+                img_url = self.file_url
+                if img_url:
+                    res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
+                    if res.status_code == 200:
+                        img = Image.open(io.BytesIO(res.content))
+                        if img.mode != "RGB":
+                            img = img.convert("RGB")
+                        self.image = img
+                        self.file_url = img_url
+                    else:
+                        print(f"Error in image download: HTTP Code {res.status_code}")
+                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                else:
+                    img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            return (imgtags, imgurl, imgid, width, height, source, pil2tensor(img))
+        else:
+            empty_image = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            return (imgtags, imgurl, imgid, width, height, source, pil2tensor(empty_image))
 
 
 NODE_DISPLAY_NAME_MAPPINGS = {
