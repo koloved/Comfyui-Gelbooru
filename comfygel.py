@@ -2,11 +2,9 @@ import requests
 import json
 from PIL import Image, ImageOps
 import re
-import requests
 import base64
 import io
 import numpy as np
-from PIL import Image, ImageOps
 import torch
 import boto3
 import comfy

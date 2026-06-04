@@ -8,7 +8,12 @@ https://github.com/user-attachments/assets/e07b95f2-61e6-4d52-9d36-7eade996e720
 
 1. Navigate to your `ComfyUI/custom_nodes` folder
 2. `git clone https://github.com/1mckw/Comfyui-Gelbooru.git`
-3. Restart ComfyUI
+3. From the ComfyUI root directory, install dependencies:
+
+   ```
+   python_embeded\python.exe -m pip install -r custom_nodes\Comfyui-Gelbooru\requirements.txt
+   ```
+4. Restart ComfyUI
 
 ## Getting API Credentials
 
