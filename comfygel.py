@@ -1,7 +1,8 @@
-import requests
+import os
 import json
 from PIL import Image, ImageOps
 import re
+import requests
 import base64
 import io
 import numpy as np
@@ -79,10 +80,48 @@ class UrlsToImage:
 
 
 class GelbooruRandom:
+    _CACHE_KEY = "GelbooruRandom"
+
     def __init__(self):
         self.last_prompt = ""
         self.file_url = ""
         self.image = None
+        self._load_cache()
+
+    def _cache_path(self):
+        return os.path.join(os.path.dirname(__file__), "gelbooru_prompt_cache.json")
+
+    def _load_cache(self):
+        path = self._cache_path()
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                cached = data.get(self._CACHE_KEY)
+                if cached:
+                    self.last_prompt = tuple(cached['last_prompt'])
+                    self.file_url = cached['file_url']
+            except Exception:
+                self.last_prompt = ""
+                self.file_url = ""
+
+    def _save_cache(self):
+        if not self.last_prompt:
+            return
+        path = self._cache_path()
+        try:
+            data = {}
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    data = json.load(f)
+            data[self._CACHE_KEY] = {
+                'last_prompt': list(self.last_prompt),
+                'file_url': self.file_url,
+            }
+            with open(path, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            pass
 
     @classmethod
     def INPUT_TYPES(s):
@@ -215,6 +254,7 @@ class GelbooruRandom:
             
             self.last_prompt = (imgtags, imgurl, imgid, width, height, source, url)
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
+            self._save_cache()
 
         if remove_tags.strip():
             to_remove = set(t.strip().lower() for t in remove_tags.split(',') if t.strip())
@@ -265,10 +305,48 @@ class GelbooruRandom:
             return (imgtags, imgurl, imgid, width, height, source, url, pil2tensor(empty_image))
 
 class GelbooruID:
+    _CACHE_KEY = "GelbooruID"
+
     def __init__(self):
         self.last_prompt = ""
         self.file_url = ""
         self.image = None
+        self._load_cache()
+
+    def _cache_path(self):
+        return os.path.join(os.path.dirname(__file__), "gelbooru_prompt_cache.json")
+
+    def _load_cache(self):
+        path = self._cache_path()
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                cached = data.get(self._CACHE_KEY)
+                if cached:
+                    self.last_prompt = tuple(cached['last_prompt'])
+                    self.file_url = cached['file_url']
+            except Exception:
+                self.last_prompt = ""
+                self.file_url = ""
+
+    def _save_cache(self):
+        if not self.last_prompt:
+            return
+        path = self._cache_path()
+        try:
+            data = {}
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    data = json.load(f)
+            data[self._CACHE_KEY] = {
+                'last_prompt': list(self.last_prompt),
+                'file_url': self.file_url,
+            }
+            with open(path, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            pass
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -313,6 +391,7 @@ class GelbooruID:
 
             self.last_prompt = (imgtags, imgurl, imgid, width, height, source)
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
+            self._save_cache()
 
         if return_picture:
             if cached:
