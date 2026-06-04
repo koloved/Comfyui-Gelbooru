@@ -91,8 +91,8 @@ class GelbooruRandom:
         return {
             "required": {
                 "site":(["Gelbooru", "Rule34"],{"tooltip": "Image board to search: Gelbooru or Rule34"}),
-                "OR_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "Tags combined with OR logic (comma-separated, at least one must match)"}),
-                "AND_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "Tags combined with AND logic (comma-separated, all must match)"}),
+                "OR_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "At least one of these tags must be present (broadens results). Example: blonde, red_hair finds images with EITHER blonde OR red_hair. Use when you want variants (hair colors, poses, outfits) in one search"}),
+                "AND_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "All of these tags must be present on the image (narrows results). Example: 1girl, smile finds images with BOTH 1girl AND smile"}),
                 "exclude_tag": ("STRING", {"default": "animated,", "multiline": True, "tooltip": "Tags to exclude from results (comma-separated)"}),
                 "note_area": ("STRING",{"default": "", "multiline": True, "tooltip": "A workspace for notes or AI instructions (not sent to API)"}),
                 "Safe": ("BOOLEAN", {"default": True, "tooltip": "Include Safe/General rated posts"}),
