@@ -81,6 +81,7 @@ class UrlsToImage:
 
 class GelbooruRandom:
     _CACHE_KEY = "GelbooruRandom"
+    _CACHE_VERSION = 2
 
     def __init__(self):
         self.last_prompt = ""
@@ -98,7 +99,7 @@ class GelbooruRandom:
                 with open(path, 'r') as f:
                     data = json.load(f)
                 cached = data.get(self._CACHE_KEY)
-                if cached:
+                if cached and cached.get('version') == self._CACHE_VERSION:
                     self.last_prompt = tuple(cached['last_prompt'])
                     self.file_url = cached['file_url']
             except Exception:
@@ -115,6 +116,7 @@ class GelbooruRandom:
                 with open(path, 'r') as f:
                     data = json.load(f)
             data[self._CACHE_KEY] = {
+                'version': self._CACHE_VERSION,
                 'last_prompt': list(self.last_prompt),
                 'file_url': self.file_url,
             }
@@ -244,8 +246,6 @@ class GelbooruRandom:
                 posts = response.json().get('post', [])
 
             imgtags = '\n'.join(post.get("tags", "").replace(" ", ", ") for post in posts)
-            if note_area.strip():
-                imgtags = imgtags + '\n' + note_area
             imgurl = '\n'.join(post.get("file_url", "") for post in posts)
             imgid = '\n'.join(str(post.get("id", "")) for post in posts)
             width = '\n'.join(str(post.get("width", 0)) for post in posts)
@@ -255,6 +255,9 @@ class GelbooruRandom:
             self.last_prompt = (imgtags, imgurl, imgid, width, height, source, url)
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
             self._save_cache()
+
+        if note_area.strip():
+            imgtags = imgtags + '\n' + note_area
 
         if remove_tags.strip():
             to_remove = set(t.strip().lower() for t in remove_tags.split(',') if t.strip())
