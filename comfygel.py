@@ -145,6 +145,9 @@ class GelbooruRandom:
                 "use_last_prompt": ("BOOLEAN", {"default": False, "tooltip": "Reuse the previous API response without making a new request"}),
                 "return_picture": ("BOOLEAN", {"default": False, "tooltip": "Download the first post's image and output as IMAGE tensor"}),
             },
+            "optional": {
+                "extra_text": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "Generated text from another node, appended after note_area (connect only, not editable)"}),
+            },
         }
         
     RETURN_TYPES = ("STRING","STRING","STRING", "INT", "INT", "STRING","STRING","IMAGE")
@@ -162,7 +165,7 @@ class GelbooruRandom:
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
-    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, note_area, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False):
+    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, note_area, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False, extra_text=None):
         cached = use_last_prompt and self.last_prompt != ""
         if cached:
             imgtags, imgurl, imgid, width, height, source, url = self.last_prompt
@@ -258,6 +261,9 @@ class GelbooruRandom:
 
         if note_area.strip():
             imgtags = imgtags + '\n' + note_area
+
+        if extra_text:
+            imgtags = imgtags + '\n' + extra_text
 
         if remove_tags.strip():
             to_remove = set(t.strip().lower() for t in remove_tags.split(',') if t.strip())
