@@ -190,6 +190,12 @@ class GelbooruRandom:
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        if not kwargs.get('use_last_prompt', False):
+            return time.time()
+        return False
+
     def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, add_good_tags, remove_bad_tags, convert_underscore, change_background, change_color, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False, extra_text=None):
         cached = use_last_prompt and self.last_prompt != ""
         if cached:
