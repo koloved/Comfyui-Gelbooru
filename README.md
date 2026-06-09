@@ -1,5 +1,7 @@
 # ComfyUI-Gelbooru
 
+![screenshot.jpg](screenshot.jpg)
+
 A set of custom nodes for ComfyUI that fetch random images from [Gelbooru](https://gelbooru.com/) and [Rule34](https://rule34.xxx/) based on tag filters, post ID, or direct URL.
 
 https://github.com/user-attachments/assets/e07b95f2-61e6-4d52-9d36-7eade996e720
@@ -41,7 +43,13 @@ Fetches random image posts from Gelbooru or Rule34 based on your tag filters.
 | `site` | Image board to search: `Gelbooru` or `Rule34` |
 | `OR_tags` | At least one of these tags must be present (broadens results). Comma-separated. |
 | `AND_tags` | Every one of these tags must be present on the image (narrows results). Comma-separated. |
-| `exclude_tag` | Tags to exclude. Comma-separated. Default: `animated` to skip GIFs/videos. |
+| `exclude_tag` | Tags to exclude from search results. Comma-separated. Default: `animated` to skip GIFs/videos. |
+| `remove_tags` | Tags to strip from the output `imgtags`. Comma-separated. Default: `censored, mosaic_censoring, bar_censor`. |
+| `add_good_tags` | Prepend quality tags (`masterpiece, best quality, amazing quality, very aesthetic`) loaded from `good_tags.txt`. `True` by default. |
+| `remove_bad_tags` | Remove known bad tags (watermark, text, censored, signature, etc.) loaded from `bad_tags.txt`. `True` by default. |
+| `convert_underscore` | Replace underscores (`_`) with spaces in the output tags. `False` by default. |
+| `change_background` | Add or remove background-related tags. Options: `Don't Change`, `Add Background`, `Remove Background`, `Remove All`. |
+| `change_color` | Add or remove color-related tags. Options: `Don't Change`, `Colored`, `Limited Palette`, `Monochrome`. |
 | `Safe` | Include Safe/General rated posts |
 | `Questionable` | Include Questionable/Sensitive rated posts |
 | `Explicit` | Include Explicit rated posts |
@@ -51,7 +59,7 @@ Fetches random image posts from Gelbooru or Rule34 based on your tag filters.
 | `count` | Number of posts to fetch per request (max 100). |
 | `use_last_prompt` | Reuse the previous API response without making a new request. Useful for iterating on the same batch. |
 | `return_picture` | Download the first post's image and output it as an IMAGE tensor. |
-| `note_area` | A workspace for notes or AI instructions (not sent to the API). |
+| `extra_text` | (Optional) Generated text from another node. Prepended before all post tags. |
 
 #### AND_tags vs OR_tags
 
@@ -76,6 +84,30 @@ Each rating toggle controls whether that rating is **included** or **excluded**:
 - **Explicit = True** (default): Explicit posts are included. Set to `False` to exclude them.
 
 The API adds rating exclusion parameters based on which toggles you disable.
+
+#### Tag Processing Pipeline
+
+The output `imgtags` is processed in this order:
+
+1. **`remove_tags`** — strips user-specified tags from the raw post tags
+2. **`remove_bad_tags`** — filters out known bad tags loaded from `bad_tags.txt`
+3. **`change_background`** — adds or removes background-related tags
+4. **`change_color`** — adds or removes color-related tags
+5. **`convert_underscore`** — replaces `_` with spaces
+6. **`extra_text`** — prepended before the processed post tags
+7. **`add_good_tags`** — prepended at the very beginning from `good_tags.txt`
+
+**Config files** (located in the node folder):
+
+- **`bad_tags.txt`** — comma-separated list of tags to remove when `remove_bad_tags` is enabled. Includes watermark, censored, text, signature, ai_generated, and more (57 tags by default). Edit this file to customize.
+- **`good_tags.txt`** — comma-separated list of quality tags prepended when `add_good_tags` is enabled. Default: `masterpiece, best quality, amazing quality, very aesthetic`.
+
+**Final output structure:**
+```
+<good_tags>
+<extra_text>
+<processed post tags>
+```
 
 ---
 
