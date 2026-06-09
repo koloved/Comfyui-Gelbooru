@@ -11,6 +11,20 @@ import boto3
 import comfy
 import time
 import urllib.parse
+import random
+
+
+COLORED_BG = ['black_background', 'aqua_background', 'white_background', 'colored_background', 'gray_background', 'blue_background', 'green_background', 'red_background', 'brown_background', 'purple_background', 'yellow_background', 'orange_background', 'pink_background', 'plain', 'transparent_background', 'simple_background', 'two-tone_background', 'grey_background']
+ADD_BG = ['outdoors', 'indoors']
+BW_BG = ['monochrome', 'greyscale', 'grayscale']
+
+
+def load_bad_tags():
+    path = os.path.join(os.path.dirname(__file__), 'bad_tags.txt')
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            return [t.strip() for t in f.read().split(',') if t.strip()]
+    return []
 
 
 #urls to image from https://github.com/wmatson/easy-comfy-nodes/blob/main/__init__.py#L140
@@ -134,6 +148,10 @@ class GelbooruRandom:
                 "AND_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "All of these tags must be present on the image (narrows results). Example: 1girl, smile finds images with BOTH 1girl AND smile"}),
 "exclude_tag": ("STRING", {"default": "animated,", "multiline": True, "tooltip": "Tags to exclude from results (comma-separated)"}),
 "remove_tags": ("STRING", {"default": "censored, mosaic_censoring, bar_censor", "multiline": True, "tooltip": "Tags to remove from the output imgtags (comma-separated). Useful for filtering out unwanted tags from the result"}),
+"remove_bad_tags": ("BOOLEAN", {"default": True, "tooltip": "Remove known bad tags (watermark, text, censored, etc.) loaded from bad_tags.txt"}),
+"convert_underscore": ("BOOLEAN", {"default": False, "tooltip": "Convert underscores to spaces in tags"}),
+"change_background": (["Don't Change", "Add Background", "Remove Background", "Remove All"], {"default": "Don't Change", "tooltip": "Add or remove background-related tags from the result"}),
+"change_color": (["Don't Change", "Colored", "Limited Palette", "Monochrome"], {"default": "Don't Change", "tooltip": "Add or remove color-related tags from the result"}),
 "note_area": ("STRING",{"default": "", "multiline": True, "tooltip": "Additional text appended to the imgtags output (useful for adding custom tags or instructions for the next node)"}),
                 "Safe": ("BOOLEAN", {"default": True, "tooltip": "Include Safe/General rated posts"}),
                 "Questionable": ("BOOLEAN", {"default": True, "tooltip": "Include Questionable/Sensitive rated posts"}),
@@ -165,7 +183,7 @@ class GelbooruRandom:
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
-    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, note_area, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False, extra_text=None):
+    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, remove_bad_tags, convert_underscore, change_background, change_color, note_area, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False, extra_text=None):
         cached = use_last_prompt and self.last_prompt != ""
         if cached:
             imgtags, imgurl, imgid, width, height, source, url = self.last_prompt
@@ -273,6 +291,60 @@ class GelbooruRandom:
                 tags = [t for t in tags if t.lower() not in to_remove]
                 cleaned.append(', '.join(tags))
             imgtags = '\n'.join(cleaned)
+
+        # Remove bad tags from bad_tags.txt
+        if remove_bad_tags:
+            bad_tags = load_bad_tags()
+            if bad_tags:
+                cleaned_lines = []
+                for line in imgtags.split('\n'):
+                    tags = [t.strip() for t in line.split(',')]
+                    tags = [t for t in tags if t.lower() not in bad_tags]
+                    for bad in bad_tags:
+                        if '*' in bad:
+                            prefix = bad.replace('*', '').lower()
+                            tags = [t for t in tags if prefix not in t.lower()]
+                    cleaned_lines.append(', '.join(tags))
+                imgtags = '\n'.join(cleaned_lines)
+
+        # Change background
+        if change_background != "Don't Change":
+            bg_lines = imgtags.split('\n')
+            processed_lines = []
+            for line in bg_lines:
+                tags = [t.strip() for t in line.split(',')]
+                if change_background == "Add Background":
+                    tags = [t for t in tags if t.lower() not in COLORED_BG]
+                    addition = 'detailed_background, ' + random.choice(ADD_BG)
+                elif change_background == "Remove Background":
+                    tags = [t for t in tags if t.lower() not in ADD_BG]
+                    addition = 'plain_background, simple_background, ' + random.choice(COLORED_BG)
+                else:
+                    tags = [t for t in tags if t.lower() not in COLORED_BG + ADD_BG]
+                    addition = ''
+                if addition:
+                    tags.append(addition)
+                processed_lines.append(', '.join(tags))
+            imgtags = '\n'.join(processed_lines)
+
+        # Change color
+        if change_color != "Don't Change":
+            color_lines = imgtags.split('\n')
+            processed_lines = []
+            for line in color_lines:
+                tags = [t.strip() for t in line.split(',')]
+                if change_color == "Colored":
+                    tags = [t for t in tags if t.lower() not in BW_BG]
+                elif change_color == "Limited Palette":
+                    tags.append('(limited_palette:1.3)')
+                elif change_color == "Monochrome":
+                    tags.append('monochrome, greyscale, grayscale')
+                processed_lines.append(', '.join(tags))
+            imgtags = '\n'.join(processed_lines)
+
+        # Convert underscore to spaces
+        if convert_underscore:
+            imgtags = imgtags.replace('_', ' ')
 
         if return_picture:
             if cached:
