@@ -26,6 +26,13 @@ def load_bad_tags():
             return [t.strip() for t in f.read().split(',') if t.strip()]
     return []
 
+def load_good_tags():
+    path = os.path.join(os.path.dirname(__file__), 'good_tags.txt')
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            return [t.strip() for t in f.read().split(',') if t.strip()]
+    return []
+
 
 #urls to image from https://github.com/wmatson/easy-comfy-nodes/blob/main/__init__.py#L140
 def loadImageFromUrl(url):
@@ -148,11 +155,11 @@ class GelbooruRandom:
                 "AND_tags": ("STRING", {"default": "", "multiline": True, "tooltip": "All of these tags must be present on the image (narrows results). Example: 1girl, smile finds images with BOTH 1girl AND smile"}),
 "exclude_tag": ("STRING", {"default": "animated,", "multiline": True, "tooltip": "Tags to exclude from results (comma-separated)"}),
 "remove_tags": ("STRING", {"default": "censored, mosaic_censoring, bar_censor", "multiline": True, "tooltip": "Tags to remove from the output imgtags (comma-separated). Useful for filtering out unwanted tags from the result"}),
+"add_good_tags": ("BOOLEAN", {"default": True, "tooltip": "Prepend quality tags (masterpiece, best quality, etc.) from good_tags.txt"}),
 "remove_bad_tags": ("BOOLEAN", {"default": True, "tooltip": "Remove known bad tags (watermark, text, censored, etc.) loaded from bad_tags.txt"}),
 "convert_underscore": ("BOOLEAN", {"default": False, "tooltip": "Convert underscores to spaces in tags"}),
 "change_background": (["Don't Change", "Add Background", "Remove Background", "Remove All"], {"default": "Don't Change", "tooltip": "Add or remove background-related tags from the result"}),
 "change_color": (["Don't Change", "Colored", "Limited Palette", "Monochrome"], {"default": "Don't Change", "tooltip": "Add or remove color-related tags from the result"}),
-"note_area": ("STRING",{"default": "", "multiline": True, "tooltip": "Additional text appended to the imgtags output (useful for adding custom tags or instructions for the next node)"}),
                 "Safe": ("BOOLEAN", {"default": True, "tooltip": "Include Safe/General rated posts"}),
                 "Questionable": ("BOOLEAN", {"default": True, "tooltip": "Include Questionable/Sensitive rated posts"}),
                 "Explicit": ("BOOLEAN", {"default": True, "tooltip": "Include Explicit rated posts"}),
@@ -164,7 +171,7 @@ class GelbooruRandom:
                 "return_picture": ("BOOLEAN", {"default": False, "tooltip": "Download the first post's image and output as IMAGE tensor"}),
             },
             "optional": {
-                "extra_text": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "Generated text from another node, appended after note_area (connect only, not editable)"}),
+                "extra_text": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "Generated text from another node, prepended before the final output (connect only, not editable)"}),
             },
         }
         
@@ -183,7 +190,7 @@ class GelbooruRandom:
     FUNCTION = "get_value"
     CATEGORY = "Gelbooru"
 
-    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, remove_bad_tags, convert_underscore, change_background, change_color, note_area, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False, extra_text=None):
+    def get_value(self, site, OR_tags, AND_tags, exclude_tag, remove_tags, add_good_tags, remove_bad_tags, convert_underscore, change_background, change_color, Safe, Questionable, Explicit, score, api_credentials, seed, count, use_last_prompt=False, return_picture=False, extra_text=None):
         cached = use_last_prompt and self.last_prompt != ""
         if cached:
             imgtags, imgurl, imgid, width, height, source, url = self.last_prompt
@@ -277,12 +284,6 @@ class GelbooruRandom:
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
             self._save_cache()
 
-        if note_area.strip():
-            imgtags = imgtags + '\n' + note_area
-
-        if extra_text:
-            imgtags = imgtags + '\n' + extra_text
-
         if remove_tags.strip():
             to_remove = set(t.strip().lower() for t in remove_tags.split(',') if t.strip())
             cleaned = []
@@ -345,6 +346,16 @@ class GelbooruRandom:
         # Convert underscore to spaces
         if convert_underscore:
             imgtags = imgtags.replace('_', ' ')
+
+        # Prepend extra_text to the final output
+        if extra_text:
+            imgtags = extra_text + '\n' + imgtags
+
+        # Prepend good_tags to the very beginning
+        if add_good_tags:
+            good_tags = load_good_tags()
+            if good_tags:
+                imgtags = ', '.join(good_tags) + '\n' + imgtags
 
         if return_picture:
             if cached:
