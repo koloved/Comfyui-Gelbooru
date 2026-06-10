@@ -389,34 +389,51 @@ class GelbooruRandom:
                     imgtags = ', '.join(good_tags) + '\n' + imgtags
 
         if return_picture:
+            referer = "https://gelbooru.com/" if site == "Gelbooru" else "https://rule34.xxx/"
             if cached:
                 if self.file_url == img_url and self.image is not None:
                     img = self.image
                 else:
                     if img_url:
-                        res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
-                        if res.status_code == 200:
-                            img = Image.open(io.BytesIO(res.content))
-                            if img.mode != "RGB":
-                                img = img.convert("RGB")
-                            self.image = img
+                        res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
+                        if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
+                            try:
+                                img = Image.open(io.BytesIO(res.content))
+                            except Exception:
+                                img = None
+                            if img is not None:
+                                if img.mode != "RGB":
+                                    img = img.convert("RGB")
+                                self.image = img
+                            else:
+                                print(f"Error decoding image from {img_url}")
+                                img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                         else:
-                            print(f"Error in image download: HTTP Code {res.status_code}")
+                            if res.status_code != 200:
+                                print(f"Error in image download: HTTP Code {res.status_code}")
                             img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                     else:
                         img = Image.new("RGB", (1, 1), color=(0, 0, 0))
             else:
                 img_url = self.file_url
                 if img_url:
-                    res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
-                    if res.status_code == 200:
-                        img = Image.open(io.BytesIO(res.content))
-                        if img.mode != "RGB":
-                            img = img.convert("RGB")
-                        self.image = img
-                        self.file_url = img_url
+                    res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
+                    if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
+                        try:
+                            img = Image.open(io.BytesIO(res.content))
+                        except Exception:
+                            img = None
+                        if img is not None:
+                            if img.mode != "RGB":
+                                img = img.convert("RGB")
+                            self.image = img
+                            self.file_url = img_url
+                        else:
+                            print(f"Error decoding image from {img_url}")
+                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                     else:
-                        print(f"Error in image download: HTTP Code {res.status_code}")
+                        if res.status_code != 200:
+                            print(f"Error in image download: HTTP Code {res.status_code}")
                         img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                 else:
                     img = Image.new("RGB", (1, 1), color=(0, 0, 0))
@@ -522,14 +539,22 @@ class GelbooruID:
                     img_url = self.file_url
                     if img_url:
                         res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
-                        if res.status_code == 200:
-                            img = Image.open(io.BytesIO(res.content))
-                            if img.mode != "RGB":
-                                img = img.convert("RGB")
-                            self.image = img
-                            self.file_url = img_url
+                        if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
+                            try:
+                                img = Image.open(io.BytesIO(res.content))
+                            except Exception:
+                                img = None
+                            if img is not None:
+                                if img.mode != "RGB":
+                                    img = img.convert("RGB")
+                                self.image = img
+                                self.file_url = img_url
+                            else:
+                                print(f"Error decoding image from {img_url}")
+                                img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                         else:
-                            print(f"Error in image download: HTTP Code {res.status_code}")
+                            if res.status_code != 200:
+                                print(f"Error in image download: HTTP Code {res.status_code}")
                             img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                     else:
                         img = Image.new("RGB", (1, 1), color=(0, 0, 0))
@@ -537,14 +562,22 @@ class GelbooruID:
                 img_url = self.file_url
                 if img_url:
                     res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
-                    if res.status_code == 200:
-                        img = Image.open(io.BytesIO(res.content))
-                        if img.mode != "RGB":
-                            img = img.convert("RGB")
-                        self.image = img
-                        self.file_url = img_url
+                    if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
+                        try:
+                            img = Image.open(io.BytesIO(res.content))
+                        except Exception:
+                            img = None
+                        if img is not None:
+                            if img.mode != "RGB":
+                                img = img.convert("RGB")
+                            self.image = img
+                            self.file_url = img_url
+                        else:
+                            print(f"Error decoding image from {img_url}")
+                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                     else:
-                        print(f"Error in image download: HTTP Code {res.status_code}")
+                        if res.status_code != 200:
+                            print(f"Error in image download: HTTP Code {res.status_code}")
                         img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                 else:
                     img = Image.new("RGB", (1, 1), color=(0, 0, 0))
