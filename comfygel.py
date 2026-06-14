@@ -395,6 +395,33 @@ class GelbooruRandom:
                     img = self.image
                 else:
                     if img_url:
+                        try:
+                            res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
+                            if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
+                                try:
+                                    img = Image.open(io.BytesIO(res.content))
+                                except Exception:
+                                    img = None
+                                if img is not None:
+                                    if img.mode != "RGB":
+                                        img = img.convert("RGB")
+                                    self.image = img
+                                else:
+                                    print(f"Error decoding image from {img_url}")
+                                    img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                            else:
+                                if res.status_code != 200:
+                                    print(f"Error in image download: HTTP Code {res.status_code}")
+                                img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                        except Exception as e:
+                            print(f"[ERROR] Network error downloading image (cached): {e}")
+                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                    else:
+                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            else:
+                img_url = self.file_url
+                if img_url:
+                    try:
                         res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
                         if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
                             try:
@@ -405,6 +432,7 @@ class GelbooruRandom:
                                 if img.mode != "RGB":
                                     img = img.convert("RGB")
                                 self.image = img
+                                self.file_url = img_url
                             else:
                                 print(f"Error decoding image from {img_url}")
                                 img = Image.new("RGB", (1, 1), color=(0, 0, 0))
@@ -412,28 +440,8 @@ class GelbooruRandom:
                             if res.status_code != 200:
                                 print(f"Error in image download: HTTP Code {res.status_code}")
                             img = Image.new("RGB", (1, 1), color=(0, 0, 0))
-                    else:
-                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
-            else:
-                img_url = self.file_url
-                if img_url:
-                    res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
-                    if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
-                        try:
-                            img = Image.open(io.BytesIO(res.content))
-                        except Exception:
-                            img = None
-                        if img is not None:
-                            if img.mode != "RGB":
-                                img = img.convert("RGB")
-                            self.image = img
-                            self.file_url = img_url
-                        else:
-                            print(f"Error decoding image from {img_url}")
-                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
-                    else:
-                        if res.status_code != 200:
-                            print(f"Error in image download: HTTP Code {res.status_code}")
+                    except Exception as e:
+                        print(f"[ERROR] Network error downloading image: {e}")
                         img = Image.new("RGB", (1, 1), color=(0, 0, 0))
                 else:
                     img = Image.new("RGB", (1, 1), color=(0, 0, 0))
