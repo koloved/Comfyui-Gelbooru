@@ -12,6 +12,25 @@ import comfy
 import time
 import urllib.parse
 import random
+from PIL import ImageDraw, ImageFont
+
+
+def not_available_image():
+    img = Image.new("RGB", (512, 512), color=(30, 30, 30))
+    try:
+        draw = ImageDraw.Draw(img)
+        text = "gelbooru not available"
+        try:
+            font = ImageFont.truetype("arial.ttf", 36)
+        except Exception:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        draw.text(((512 - tw) // 2, (512 - th) // 2), text, fill=(200, 200, 200), font=font)
+    except Exception:
+        pass
+    return img
 
 
 COLORED_BG = ['black_background', 'aqua_background', 'white_background', 'colored_background', 'gray_background', 'blue_background', 'green_background', 'red_background', 'brown_background', 'purple_background', 'yellow_background', 'orange_background', 'pink_background', 'plain', 'transparent_background', 'simple_background', 'two-tone_background', 'grey_background']
@@ -408,16 +427,16 @@ class GelbooruRandom:
                                     self.image = img
                                 else:
                                     print(f"Error decoding image from {img_url}")
-                                    img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                                    img = not_available_image()
                             else:
                                 if res.status_code != 200:
                                     print(f"Error in image download: HTTP Code {res.status_code}")
-                                img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                                img = not_available_image()
                         except Exception as e:
                             print(f"[ERROR] Network error downloading image (cached): {e}")
-                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                            img = not_available_image()
                     else:
-                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                        img = not_available_image()
             else:
                 img_url = self.file_url
                 if img_url:
@@ -435,19 +454,19 @@ class GelbooruRandom:
                                 self.file_url = img_url
                             else:
                                 print(f"Error decoding image from {img_url}")
-                                img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                                img = not_available_image()
                         else:
                             if res.status_code != 200:
                                 print(f"Error in image download: HTTP Code {res.status_code}")
-                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                            img = not_available_image()
                     except Exception as e:
                         print(f"[ERROR] Network error downloading image: {e}")
-                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                        img = not_available_image()
                 else:
-                    img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                    img = not_available_image()
             return (imgtags, imgurl, imgid, width, height, source, url, pil2tensor(img))
         else:
-            empty_image = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            empty_image = not_available_image()
             return (imgtags, imgurl, imgid, width, height, source, url, pil2tensor(empty_image))
 
 class GelbooruID:
@@ -559,13 +578,13 @@ class GelbooruID:
                                 self.file_url = img_url
                             else:
                                 print(f"Error decoding image from {img_url}")
-                                img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                                img = not_available_image()
                         else:
                             if res.status_code != 200:
                                 print(f"Error in image download: HTTP Code {res.status_code}")
-                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                            img = not_available_image()
                     else:
-                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                        img = not_available_image()
             else:
                 img_url = self.file_url
                 if img_url:
@@ -582,16 +601,16 @@ class GelbooruID:
                             self.file_url = img_url
                         else:
                             print(f"Error decoding image from {img_url}")
-                            img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                            img = not_available_image()
                     else:
                         if res.status_code != 200:
                             print(f"Error in image download: HTTP Code {res.status_code}")
-                        img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                        img = not_available_image()
                 else:
-                    img = Image.new("RGB", (1, 1), color=(0, 0, 0))
+                    img = not_available_image()
             return (imgtags, imgurl, imgid, width, height, source, pil2tensor(img))
         else:
-            empty_image = Image.new("RGB", (1, 1), color=(0, 0, 0))
+            empty_image = not_available_image()
             return (imgtags, imgurl, imgid, width, height, source, pil2tensor(empty_image))
 
 
