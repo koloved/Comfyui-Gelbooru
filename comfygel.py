@@ -33,6 +33,26 @@ def not_available_image():
     return img
 
 
+def _refresh_file_url(post_id, api_credentials, site="Gelbooru"):
+    if not post_id:
+        return ""
+    parsed = urllib.parse.parse_qs(api_credentials.lstrip('&'))
+    api_key = parsed.get('api_key', [''])[0]
+    user_id = parsed.get('user_id', [''])[0]
+    base = "https://gelbooru.com/index.php" if site == "Gelbooru" else "https://api.rule34.xxx/index.php"
+    url = f"{base}?page=dapi&s=post&q=index&id={post_id}&json=1"
+    if api_key and user_id:
+        url += f"&api_key={api_key}&user_id={user_id}"
+    try:
+        r = requests.get(url, timeout=10, verify=True)
+        posts = r.json().get('post', []) if site == "Gelbooru" else r.json()
+        if posts:
+            return posts[0].get("file_url", "")
+    except Exception:
+        pass
+    return ""
+
+
 COLORED_BG = ['black_background', 'aqua_background', 'white_background', 'colored_background', 'gray_background', 'blue_background', 'green_background', 'red_background', 'brown_background', 'purple_background', 'yellow_background', 'orange_background', 'pink_background', 'plain', 'transparent_background', 'simple_background', 'two-tone_background', 'grey_background']
 ADD_BG = ['outdoors', 'indoors']
 BW_BG = ['monochrome', 'greyscale', 'grayscale']
@@ -128,6 +148,8 @@ class GelbooruRandom:
         self.previous_prompt = ""
         self.file_url = ""
         self.previous_file_url = ""
+        self.post_id = ""
+        self.previous_post_id = ""
         self.image = None
         self._load_cache()
 
@@ -232,10 +254,15 @@ class GelbooruRandom:
             cached = True
             imgtags, imgurl, imgid, width, height, source, url = self.last_prompt
             img_url = self.file_url
+            if not self.post_id:
+                self.post_id = imgid.split('\n')[0] if imgid else ""
         elif use_last_prompt == "Previous Prompt" and self.previous_prompt != "":
             cached = True
             imgtags, imgurl, imgid, width, height, source, url = self.previous_prompt
             img_url = self.previous_file_url
+            if not self.previous_post_id:
+                self.previous_post_id = imgid.split('\n')[0] if imgid else ""
+            self.post_id = self.previous_post_id
 
         if not cached:
             parsed = urllib.parse.parse_qs(api_credentials.lstrip('&'))
@@ -326,8 +353,10 @@ class GelbooruRandom:
             if self.last_prompt:
                 self.previous_prompt = self.last_prompt
                 self.previous_file_url = self.file_url
+                self.previous_post_id = self.post_id
             self.last_prompt = (imgtags, imgurl, imgid, width, height, source, url)
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
+            self.post_id = imgid.split('\n')[0] if imgid else ""
             self._save_cache()
 
         if use_custom_prompt and custom_prompt is not None:
@@ -409,60 +438,57 @@ class GelbooruRandom:
 
         if return_picture:
             referer = "https://gelbooru.com/" if site == "Gelbooru" else "https://rule34.xxx/"
+
+            def _try_download(url_to_try, store=False):
+                if not url_to_try:
+                    return None
+                try:
+                    r = requests.get(url_to_try, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
+                    if r.status_code == 200 and 'image' in (r.headers.get('content-type', '') or ''):
+                        try:
+                            im = Image.open(io.BytesIO(r.content))
+                        except Exception:
+                            im = None
+                        if im is not None:
+                            if im.mode != "RGB":
+                                im = im.convert("RGB")
+                            if store:
+                                self.image = im
+                                self.file_url = url_to_try
+                            return im
+                except Exception:
+                    pass
+                return None
+
+            def _refresh_and_retry():
+                fresh_url = _refresh_file_url(self.post_id, api_credentials, site)
+                if fresh_url and fresh_url != img_url:
+                    print(f"[INFO] Refreshed cached image URL: {fresh_url}")
+                    img = _try_download(fresh_url, store=True)
+                    if img is not None:
+                        # Update cache with new file_url
+                        old = list(self.last_prompt)
+                        old[1] = fresh_url  # imgurl
+                        self.last_prompt = tuple(old)
+                        self.file_url = fresh_url
+                        self._save_cache()
+                        return img
+                return None
+
             if cached:
                 if self.file_url == img_url and self.image is not None:
                     img = self.image
                 else:
-                    if img_url:
-                        try:
-                            res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
-                            if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
-                                try:
-                                    img = Image.open(io.BytesIO(res.content))
-                                except Exception:
-                                    img = None
-                                if img is not None:
-                                    if img.mode != "RGB":
-                                        img = img.convert("RGB")
-                                    self.image = img
-                                else:
-                                    print(f"Error decoding image from {img_url}")
-                                    img = not_available_image()
-                            else:
-                                if res.status_code != 200:
-                                    print(f"Error in image download: HTTP Code {res.status_code}")
-                                img = not_available_image()
-                        except Exception as e:
-                            print(f"[ERROR] Network error downloading image (cached): {e}")
-                            img = not_available_image()
-                    else:
+                    img = _try_download(img_url, store=True)
+                    if img is None:
+                        img = _refresh_and_retry()
+                    if img is None:
+                        print(f"[WARN] All download attempts failed for post {self.post_id}")
                         img = not_available_image()
             else:
                 img_url = self.file_url
-                if img_url:
-                    try:
-                        res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
-                        if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
-                            try:
-                                img = Image.open(io.BytesIO(res.content))
-                            except Exception:
-                                img = None
-                            if img is not None:
-                                if img.mode != "RGB":
-                                    img = img.convert("RGB")
-                                self.image = img
-                                self.file_url = img_url
-                            else:
-                                print(f"Error decoding image from {img_url}")
-                                img = not_available_image()
-                        else:
-                            if res.status_code != 200:
-                                print(f"Error in image download: HTTP Code {res.status_code}")
-                            img = not_available_image()
-                    except Exception as e:
-                        print(f"[ERROR] Network error downloading image: {e}")
-                        img = not_available_image()
-                else:
+                img = _try_download(img_url, store=True)
+                if img is None:
                     img = not_available_image()
             return (imgtags, imgurl, imgid, width, height, source, url, pil2tensor(img))
         else:
@@ -475,6 +501,7 @@ class GelbooruID:
     def __init__(self):
         self.last_prompt = ""
         self.file_url = ""
+        self.post_id = ""
         self.image = None
         self._load_cache()
 
@@ -491,9 +518,11 @@ class GelbooruID:
                 if cached:
                     self.last_prompt = tuple(cached['last_prompt'])
                     self.file_url = cached['file_url']
+                    self.post_id = cached.get('post_id', '')
             except Exception:
                 self.last_prompt = ""
                 self.file_url = ""
+                self.post_id = ""
 
     def _save_cache(self):
         if not self.last_prompt:
@@ -507,6 +536,7 @@ class GelbooruID:
             data[self._CACHE_KEY] = {
                 'last_prompt': list(self.last_prompt),
                 'file_url': self.file_url,
+                'post_id': self.post_id,
             }
             with open(path, 'w') as f:
                 json.dump(data, f, indent=2)
@@ -542,6 +572,8 @@ class GelbooruID:
         if cached:
             imgtags, imgurl, imgid, width, height, source = self.last_prompt
             img_url = self.file_url
+            if not self.post_id:
+                self.post_id = imgid.split('\n')[0] if imgid else ""
         else:
             url = "https://gelbooru.com/index.php?page=dapi&s=post&q=index&id="+post_id+"&json=1"
             time.sleep(0.1)
@@ -556,57 +588,62 @@ class GelbooruID:
 
             self.last_prompt = (imgtags, imgurl, imgid, width, height, source)
             self.file_url = imgurl.split('\n')[0] if imgurl else ""
+            self.post_id = imgid.split('\n')[0] if imgid else ""
             self._save_cache()
 
         if return_picture:
+            referer = "https://gelbooru.com/"
+
+            def _try_download(url_to_try, store=False):
+                if not url_to_try:
+                    return None
+                try:
+                    r = requests.get(url_to_try, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": referer})
+                    if r.status_code == 200 and 'image' in (r.headers.get('content-type', '') or ''):
+                        try:
+                            im = Image.open(io.BytesIO(r.content))
+                        except Exception:
+                            im = None
+                        if im is not None:
+                            if im.mode != "RGB":
+                                im = im.convert("RGB")
+                            if store:
+                                self.image = im
+                                self.file_url = url_to_try
+                            return im
+                except Exception:
+                    pass
+                return None
+
+            def _refresh_and_retry():
+                fresh_url = _refresh_file_url(self.post_id, "", "Gelbooru")
+                if fresh_url and fresh_url != img_url:
+                    print(f"[INFO] Refreshed cached image URL: {fresh_url}")
+                    img = _try_download(fresh_url, store=True)
+                    if img is not None:
+                        # Update cache with new file_url
+                        old = list(self.last_prompt)
+                        old[1] = fresh_url  # imgurl
+                        self.last_prompt = tuple(old)
+                        self.file_url = fresh_url
+                        self._save_cache()
+                        return img
+                return None
+
             if cached:
                 if self.file_url == img_url and self.image is not None:
                     img = self.image
                 else:
-                    img_url = self.file_url
-                    if img_url:
-                        res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
-                        if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
-                            try:
-                                img = Image.open(io.BytesIO(res.content))
-                            except Exception:
-                                img = None
-                            if img is not None:
-                                if img.mode != "RGB":
-                                    img = img.convert("RGB")
-                                self.image = img
-                                self.file_url = img_url
-                            else:
-                                print(f"Error decoding image from {img_url}")
-                                img = not_available_image()
-                        else:
-                            if res.status_code != 200:
-                                print(f"Error in image download: HTTP Code {res.status_code}")
-                            img = not_available_image()
-                    else:
+                    img = _try_download(img_url, store=True)
+                    if img is None:
+                        img = _refresh_and_retry()
+                    if img is None:
+                        print(f"[WARN] All download attempts failed for post {self.post_id}")
                         img = not_available_image()
             else:
                 img_url = self.file_url
-                if img_url:
-                    res = requests.get(img_url, timeout=5, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://gelbooru.com/"})
-                    if res.status_code == 200 and 'image' in (res.headers.get('content-type', '') or ''):
-                        try:
-                            img = Image.open(io.BytesIO(res.content))
-                        except Exception:
-                            img = None
-                        if img is not None:
-                            if img.mode != "RGB":
-                                img = img.convert("RGB")
-                            self.image = img
-                            self.file_url = img_url
-                        else:
-                            print(f"Error decoding image from {img_url}")
-                            img = not_available_image()
-                    else:
-                        if res.status_code != 200:
-                            print(f"Error in image download: HTTP Code {res.status_code}")
-                        img = not_available_image()
-                else:
+                img = _try_download(img_url, store=True)
+                if img is None:
                     img = not_available_image()
             return (imgtags, imgurl, imgid, width, height, source, pil2tensor(img))
         else:
